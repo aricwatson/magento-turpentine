@@ -19,7 +19,7 @@
 
 SITEMAP_URL="$1"
 TMP_URL_FILE="/tmp/urls_$(cat /proc/sys/kernel/random/uuid).txt"
-PROCS="${PROCS-$(grep processor /proc/cpuinfo | wc -l)}"
+PROCS="$2"
 
 echo '<root/>' | xpath -e '*' &>/dev/null
 
@@ -49,16 +49,10 @@ curl -ks "$SITEMAP_URL" | \
 	sed -r 's~http(s)?:~\nhttp\1:~g' | \
     grep -vE '^\s*$' > "$TMP_URL_FILE"
 
-echo "Warming $(cat $TMP_URL_FILE | wc -l) URLs using $PROCS processes..."
+echo "Warming $(cat $TMP_URL_FILE | wc -l) URLs using $PROCS concurrent users..."
+cat $TMP_URL_FILE
 
-cat "$TMP_URL_FILE" | \
-    xargs -P "$PROCS" -r -n 1 -- \
-        siege -b -v -c 1 -r once 2>/dev/null | \
-    sed -r 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]//g' | \
-    grep -E '^HTTP'
-cat "$TMP_URL_FILE" | \
-    xargs -P "$PROCS" -r -n 1 -- \
-        siege -H 'Accept-Encoding: gzip' -b -v -c 1 -r once 2>/dev/null | \
+siege -b -v -c $PROCS -f $TMP_URL_FILE -r once -H 'Accept-Encoding: gzip' 2>/dev/null |
     sed -r 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]//g' | \
     grep -E '^HTTP'
 
